@@ -1,11 +1,16 @@
 body {
+  margin: 0;
   background: #0f172a;
   color: white;
   font-family: Arial;
+}
+
+.top-bar {
+  padding: 10px;
   text-align: center;
 }
 
-.join input, select, button {
+.top-bar input, select, button {
   padding: 10px;
   margin: 5px;
 }
@@ -32,25 +37,26 @@ body {
 
 .subtitle {
   position: absolute;
-  bottom: 6px;
+  bottom: 5px;
   left: 0;
   right: 0;
   background: rgba(0,0,0,0.6);
   color: #00ffcc;
-  font-size: 14px;
   padding: 5px;
+  font-size: 14px;
 }
 
 .controls {
   position: fixed;
-  bottom: 20px;
+  bottom: 15px;
   width: 100%;
+  text-align: center;
 }
 
 .controls button {
   font-size: 20px;
-  margin: 10px;
   padding: 10px 15px;
+  margin: 8px;
 }
 
 .end {
