@@ -10,17 +10,18 @@ io.on("connection", socket => {
   socket.on("join-room", roomId => {
     socket.join(roomId);
 
+    // Send existing users to new user
+    const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []);
+    socket.emit("existing-users", clients.filter(id => id !== socket.id));
+
+    // Tell others a new user joined
     socket.to(roomId).emit("user-joined", socket.id);
 
-    socket.on("signal", data => {
-      socket.to(roomId).emit("signal", {
+    socket.on("signal", ({ target, data }) => {
+      io.to(target).emit("signal", {
         sender: socket.id,
-        signal: data
+        data
       });
-    });
-
-    socket.on("translated-text", data => {
-      socket.to(roomId).emit("translated-text", data);
     });
 
     socket.on("disconnect", () => {
@@ -31,5 +32,5 @@ io.on("connection", socket => {
 });
 
 http.listen(3000, () => {
-  console.log("Server running on http://localhost:3000");
+  console.log("Server running on port 3000");
 });
