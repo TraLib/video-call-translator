@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Live Video Translator</title>
+  <title>Live Translator Meet</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="top">
-  <input id="roomId" placeholder="Enter Room Code">
+  <input id="roomId" placeholder="Room Code">
   <select id="lang">
     <option value="en-US">English</option>
     <option value="hi-IN">Hindi</option>
@@ -16,10 +16,7 @@
   <button onclick="joinRoom()">Join</button>
 </div>
 
-<div class="videos">
-  <video id="localVideo" autoplay muted></video>
-  <video id="remoteVideo" autoplay></video>
-</div>
+<div id="videos" class="videos"></div>
 
 <div class="controls">
   <button onclick="toggleMic()">🎤</button>
