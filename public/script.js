@@ -1,7 +1,13 @@
 const socket = io();
 const peers = {};
 let localStream;
-let recognition;
+
+const rtcConfig = {
+  iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:stun1.l.google.com:19302" }
+  ]
+};
 
 async function joinRoom() {
   const roomId = document.getElementById("roomId").value;
@@ -13,16 +19,24 @@ async function joinRoom() {
   });
 
   addVideo("me", localStream);
-  startSpeech();
 
-  socket.on("user-joined", id => createPeer(id, true));
+  socket.on("existing-users", users => {
+    users.forEach(id => createPeer(id, true));
+  });
+
+  socket.on("user-joined", id => {
+    createPeer(id, false);
+  });
+
   socket.on("signal", handleSignal);
 }
 
 function createPeer(id, initiator) {
-  const pc = new RTCPeerConnection();
+  const pc = new RTCPeerConnection(rtcConfig);
 
-  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
+  localStream.getTracks().forEach(track =>
+    pc.addTrack(track, localStream)
+  );
 
   pc.ontrack = e => addVideo(id, e.streams[0]);
 
@@ -30,37 +44,43 @@ function createPeer(id, initiator) {
     if (e.candidate) {
       socket.emit("signal", {
         target: id,
-        candidate: e.candidate
+        data: { candidate: e.candidate }
       });
     }
   };
 
   if (initiator) {
-    pc.createOffer().then(o => {
-      pc.setLocalDescription(o);
-      socket.emit("signal", { target: id, sdp: o });
+    pc.createOffer().then(offer => {
+      pc.setLocalDescription(offer);
+      socket.emit("signal", {
+        target: id,
+        data: { sdp: offer }
+      });
     });
   }
 
   peers[id] = pc;
 }
 
-function handleSignal({ sender, signal }) {
-  if (!peers[sender]) createPeer(sender, false);
-  const pc = peers[sender];
+function handleSignal({ sender, data }) {
+  let pc = peers[sender];
+  if (!pc) pc = createPeer(sender, false);
 
-  if (signal.sdp) {
-    pc.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-    if (signal.sdp.type === "offer") {
-      pc.createAnswer().then(a => {
-        pc.setLocalDescription(a);
-        socket.emit("signal", { target: sender, sdp: a });
+  if (data.sdp) {
+    pc.setRemoteDescription(new RTCSessionDescription(data.sdp));
+    if (data.sdp.type === "offer") {
+      pc.createAnswer().then(answer => {
+        pc.setLocalDescription(answer);
+        socket.emit("signal", {
+          target: sender,
+          data: { sdp: answer }
+        });
       });
     }
   }
 
-  if (signal.candidate) {
-    pc.addIceCandidate(new RTCIceCandidate(signal.candidate));
+  if (data.candidate) {
+    pc.addIceCandidate(new RTCIceCandidate(data.candidate));
   }
 }
 
@@ -82,29 +102,6 @@ function addVideo(id, stream) {
   box.appendChild(video);
   box.appendChild(subtitle);
   document.getElementById("video-grid").appendChild(box);
-}
-
-function startSpeech() {
-  recognition = new webkitSpeechRecognition();
-  recognition.lang = document.getElementById("language").value;
-  recognition.continuous = true;
-
-  recognition.onresult = e => {
-    const text = e.results[e.results.length - 1][0].transcript;
-    socket.emit("translated-text", text);
-    showSubtitle("me", text);
-  };
-
-  recognition.start();
-
-  socket.on("translated-text", text => {
-    showSubtitle("remote", text);
-  });
-}
-
-function showSubtitle(id, text) {
-  const box = document.getElementById(id);
-  if (box) box.querySelector(".subtitle").innerText = text;
 }
 
 // Controls
