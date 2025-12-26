@@ -1,0 +1,55 @@
+body {
+  margin: 0;
+  background: #0f172a;
+  font-family: Arial;
+  color: white;
+  text-align: center;
+}
+
+.top {
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+input, select, button {
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+}
+
+button {
+  cursor: pointer;
+}
+
+.videos {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+video {
+  width: 45%;
+  border-radius: 12px;
+  border: 2px solid #22c55e;
+}
+
+.controls {
+  margin-top: 15px;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.controls button {
+  font-size: 20px;
+  padding: 12px;
+  border-radius: 50%;
+}
+
+.controls .end {
+  background: red;
+  color: white;
+}

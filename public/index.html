@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Live Video Translator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="top">
+  <input id="roomId" placeholder="Enter Room Code">
+  <select id="lang">
+    <option value="en-US">English</option>
+    <option value="hi-IN">Hindi</option>
+    <option value="gu-IN">Gujarati</option>
+  </select>
+  <button onclick="joinRoom()">Join</button>
+</div>
+
+<div class="videos">
+  <video id="localVideo" autoplay muted></video>
+  <video id="remoteVideo" autoplay></video>
+</div>
+
+<div class="controls">
+  <button onclick="toggleMic()">🎤</button>
+  <button onclick="toggleCamera()">📷</button>
+  <button class="end" onclick="endCall()">❌</button>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
