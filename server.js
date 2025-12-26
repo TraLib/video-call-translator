@@ -13,8 +13,9 @@ io.on("connection", socket => {
       socket.to(roomId).emit("signal", data);
     });
 
-    socket.on("translated-text", text => {
-      socket.to(roomId).emit("translated-text", text);
+    // 🔥 FIX IS HERE
+    socket.on("translated-text", data => {
+      socket.to(roomId).emit("translated-text", data);
     });
   });
 });
@@ -24,4 +25,3 @@ const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
   console.log("Server running on port " + PORT);
 });
-
