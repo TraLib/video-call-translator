@@ -1,74 +1,101 @@
 const socket = io();
 let localStream;
-let peer;
+let peers = {};
 let recognition;
-let isCaller = false;
 
-/* JOIN ROOM */
 async function joinRoom() {
-  const roomId = document.getElementById("roomId").value;
-  if (!roomId) return alert("Enter room code");
+  const roomId = roomIdInput.value;
+  if (!roomId) return alert("Enter Room Code");
+
+  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+  addVideo(socket.id, localStream);
 
   socket.emit("join-room", roomId);
 
-  socket.on("created", () => isCaller = true);
-  socket.on("joined", () => isCaller = false);
-  socket.on("ready", () => {
-    if (isCaller) createOffer();
+  socket.on("all-users", users => {
+    users.forEach(createPeer);
   });
 
-  localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-  document.getElementById("localVideo").srcObject = localStream;
+  socket.on("signal", async ({ from, data }) => {
+    if (!peers[from]) createPeer(from, true);
 
-  createPeer();
+    if (data.sdp) {
+      await peers[from].setRemoteDescription(new RTCSessionDescription(data.sdp));
+      if (data.sdp.type === "offer") {
+        const answer = await peers[from].createAnswer();
+        await peers[from].setLocalDescription(answer);
+        socket.emit("signal", { to: from, data: { sdp: peers[from].localDescription }});
+      }
+    } else if (data.candidate) {
+      await peers[from].addIceCandidate(new RTCIceCandidate(data.candidate));
+    }
+  });
+
+  socket.on("user-left", id => {
+    if (peers[id]) peers[id].close();
+    document.getElementById(id)?.remove();
+    delete peers[id];
+  });
+
   startSpeechRecognition();
 }
 
-/* WEBRTC */
-function createPeer() {
-  peer = new RTCPeerConnection({
+function createPeer(id, incoming = false) {
+  const pc = new RTCPeerConnection({
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }]
   });
 
-  localStream.getTracks().forEach(track => peer.addTrack(track, localStream));
+  localStream.getTracks().forEach(t => pc.addTrack(t, localStream));
 
-  peer.ontrack = e => {
-    document.getElementById("remoteVideo").srcObject = e.streams[0];
-  };
+  pc.ontrack = e => addVideo(id, e.streams[0]);
 
-  peer.onicecandidate = e => {
-    if (e.candidate) socket.emit("signal", { candidate: e.candidate });
-  };
-}
-
-async function createOffer() {
-  const offer = await peer.createOffer();
-  await peer.setLocalDescription(offer);
-  socket.emit("signal", { sdp: offer });
-}
-
-socket.on("signal", async data => {
-  if (data.sdp) {
-    await peer.setRemoteDescription(new RTCSessionDescription(data.sdp));
-    if (data.sdp.type === "offer") {
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      socket.emit("signal", { sdp: peer.localDescription });
+  pc.onicecandidate = e => {
+    if (e.candidate) {
+      socket.emit("signal", { to: id, data: { candidate: e.candidate }});
     }
-  } else if (data.candidate) {
-    await peer.addIceCandidate(new RTCIceCandidate(data.candidate));
-  }
-});
+  };
 
-/* SPEECH RECOGNITION */
+  peers[id] = pc;
+
+  if (!incoming) {
+    pc.createOffer().then(o => {
+      pc.setLocalDescription(o);
+      socket.emit("signal", { to: id, data: { sdp: o }});
+    });
+  }
+}
+
+function addVideo(id, stream) {
+  if (document.getElementById(id)) return;
+
+  const box = document.createElement("div");
+  box.className = "video-box";
+  box.id = id;
+
+  const video = document.createElement("video");
+  video.autoplay = true;
+  video.srcObject = stream;
+
+  const sub = document.createElement("div");
+  sub.className = "subtitle";
+  sub.innerText = "";
+
+  box.append(video, sub);
+  videos.appendChild(box);
+}
+
+/* SUBTITLES + BETTER ACCURACY */
 function startSpeechRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   recognition = new SR();
   recognition.continuous = true;
-  recognition.lang = document.getElementById("lang").value;
+  recognition.lang = lang.value;
 
   recognition.onresult = e => {
     const text = e.results[e.results.length - 1][0].transcript;
+
+    document.querySelector(`#${socket.id} .subtitle`).innerText = text;
+
     socket.emit("translated-text", {
       text,
       lang: recognition.lang
@@ -78,9 +105,8 @@ function startSpeechRecognition() {
   recognition.start();
 }
 
-/* TRANSLATE + SPEAK */
 socket.on("translated-text", async data => {
-  const myLang = document.getElementById("lang").value.split("-")[0];
+  const myLang = lang.value.split("-")[0];
   const fromLang = data.lang.split("-")[0];
   if (myLang === fromLang) return;
 
@@ -88,28 +114,21 @@ socket.on("translated-text", async data => {
     `https://api.mymemory.translated.net/get?q=${encodeURIComponent(data.text)}&langpair=${fromLang}|${myLang}`
   );
   const json = await res.json();
-  speak(json.responseData.translatedText, myLang);
-});
 
-function speak(text, lang) {
-  const msg = new SpeechSynthesisUtterance(text);
-  msg.lang = lang;
-  speechSynthesis.speak(msg);
-}
+  speechSynthesis.speak(new SpeechSynthesisUtterance(json.responseData.translatedText));
+});
 
 /* CONTROLS */
 function toggleMic() {
-  localStream.getAudioTracks()[0].enabled =
-    !localStream.getAudioTracks()[0].enabled;
+  localStream.getAudioTracks()[0].enabled = !localStream.getAudioTracks()[0].enabled;
 }
 
 function toggleCamera() {
-  localStream.getVideoTracks()[0].enabled =
-    !localStream.getVideoTracks()[0].enabled;
+  localStream.getVideoTracks()[0].enabled = !localStream.getVideoTracks()[0].enabled;
 }
 
 function endCall() {
-  peer.close();
+  Object.values(peers).forEach(p => p.close());
   localStream.getTracks().forEach(t => t.stop());
   location.reload();
 }
